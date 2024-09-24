@@ -3,7 +3,7 @@
 
 ## Hardware part at OSHWLab (ongoing)
 
-[https://oshwlab.com/rrguardo83/water-level-.pro-s1-v2](https://oshwlab.com/rrguardo83/automatic-water-pump-for-s1)
+[WiFi Smart Water Pump Controller S1](https://oshwlab.com/rrguardo83/automatic-water-pump-for-s1)
 
 ## Disclaimer
 
