@@ -1,4 +1,4 @@
-# WiFi-Smart-Water-Pump-Controller-S1
+# WiFi Smart Water Pump Controller S1
 
 
 ## Hardware part at OSHWLab (ongoing)
