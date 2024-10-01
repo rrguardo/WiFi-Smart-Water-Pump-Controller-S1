@@ -45,6 +45,11 @@ For more details about important 3d printing recommendations
 
 ![Smart Water Pump Controller S1](images/1.png)
 
+---
+# TODO:
+
+* check case when internet is lost and pump on
+* ...
 
 
 ## Disclaimer
