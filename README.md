@@ -4,7 +4,7 @@
 
 Introduction
 
-The **WiFi Smart Water Pump Controller S1**  is an innovative device 
+The [WiFi Smart Water Pump Controller S1](https://waterlevel.pro/products/WiFi-Smart-Water-Pump-Controller-S1)  is an innovative device 
 engineered to provide seamless control of water pumps through WiFi connectivity. 
 Designed to integrate effortlessly with the **WiFi Water Level S1**, this controller 
 offers a comprehensive solution for managing water levels and automating pump operations. 
