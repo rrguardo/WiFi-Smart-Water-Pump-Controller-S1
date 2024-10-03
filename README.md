@@ -23,12 +23,17 @@ under the GPLv3 license, allowing for free use and modification.
   <img src="images/openhardware.jpg" alt="Imagen 1" width="150" style="margin-right: 10px;margin-left: 50px;"/>
 </div>
 
-
-
 ## Hardware part at OSHWLab (ongoing)
 
 [WiFi Smart Water Pump Controller S1](https://oshwlab.com/rrguardo83/automatic-water-pump-for-s1)
 
+## Microcontroller Software
+
+[ArduinoIDE INO File](MicrocontrollerCode.ino)
+
+This devide use ESP32-C3 microcontroller can use Arduino IDE to flash/upload microcontroller code, using **ESP32C3 Dev Module** as board.
+
+Before upload the code, generate a new private and public keys in developer zone at https://waterlevel.pro/settings  (TODO)
 
 ---
 ## FreeCad 3D printable case components
