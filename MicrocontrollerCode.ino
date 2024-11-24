@@ -18,13 +18,16 @@
  *
  */
 
-// Libraries used:
-// WiFiManager by tzapu version: 2.0.16-rc.2 
-// U8g2 by oliver version: 2.34.22 
+// IDE and Board
 // Board: ESP32-C3-MINI-1U-H4 
 // Arduino Framework version: 2.3.2
 // Arduino Board Module: ESP32C3 Dev Module
 // Board Manager URL: https://arduino.esp8266.com/stable/package_esp8266com_index.json 
+
+// Libraries used:
+// WiFiManager by tzapu version: 2.0.16-rc.2 
+// U8g2 by oliver version: 2.34.22 
+
 
 #include <Arduino.h>
 #include <U8g2lib.h>
