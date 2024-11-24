@@ -1,5 +1,31 @@
 // ongoing project, current progress
 
+/*
+ * This file is part of WiFi Smart Water Pump Controller S1 project.
+ *
+ * WiFi Smart Water Pump Controller S1 is free software and hardware: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
+// Libraries used:
+// WiFiManager by tzapu version: 2.0.16-rc.2 
+// U8g2 by oliver version: 2.34.22 
+// Board: ESP32-C3-MINI-1U-H4 
+// Arduino Framework version: 2.3.2
+// Arduino Board Module: ESP32C3 Dev Module
+// Board Manager URL: https://arduino.esp8266.com/stable/package_esp8266com_index.json 
+
 #include <Arduino.h>
 #include <U8g2lib.h>
 
