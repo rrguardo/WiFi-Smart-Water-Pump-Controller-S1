@@ -27,6 +27,7 @@
 // Libraries used:
 // WiFiManager by tzapu version: 2.0.16-rc.2 
 // U8g2 by oliver version: 2.34.22 
+// Time by Michael Margolis version: 1.6.1
 
 
 #include <Arduino.h>
