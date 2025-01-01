@@ -20,13 +20,13 @@
 
 // IDE and Board
 // Board: ESP32-C3-MINI-1U-H4 
-// Arduino Framework version: 2.3.2
+// Arduino Framework version: 2.3.4
 // Arduino Board Module: ESP32C3 Dev Module
 // Board Manager URL: https://arduino.esp8266.com/stable/package_esp8266com_index.json 
 
 // Libraries used:
 // WiFiManager by tzapu version: 2.0.16-rc.2 
-// U8g2 by oliver version: 2.34.22 
+// U8g2 by oliver version: 2.35.30 
 // Time by Michael Margolis version: 1.6.1
 
 
@@ -48,27 +48,39 @@
 
 
 #define RELAY_PIN_1 0
+#define EMAIL_MAX_LENGTH 128
+#define DEBUG  // Comment this line to disable serial prints
 
 // DEV MODE allow app update remote
 const bool DEV_MODE = false; // used for ON/OFF live-updates and other other safety instructions for easy development
 const bool LIVE_UPDATE = true; // used for ON/OFF live-updates and other other safety instructions for easy development
 
 const char* firmwareUrl = "https://waterlevel.pro/static/fw";
-int FIRMW_VER = 11;
+int FIRMW_VER = 14;
 
 // Pin del botón wifi-setup/reset
 const int pinBoton = 1;
 
 // Replace this with the URL you want to send the GET request to
 const char* host_url = "https://api.waterlevel.pro/relay-update";
-char* api_key = "PASTE Your Key Here"; // use "-" for updates // generate new key in developer zone at https://waterlevel.pro/settings
 
-const char* WIFI_NAME = "AutoConnectSetup";
+const char* host_link_url = "https://api.waterlevel.pro/link";
+
+char api_key[128] = "-";  //  PRIVATE KEY HERE // "-" none-null-api-key
+// use value "-" for automatic api key setup
+// or manually generate and use new key in developer zone at https://waterlevel.pro/settings   https://waterlevel.pro/add_relay
+
+
+const char* WIFI_NAME = "WaterLevelProSetup";
 const char* WIFI_PASSW = "1122334455";
+char email[EMAIL_MAX_LENGTH] = "-";  // Variable to store email
 
 WiFiManager wm;
-nvs_handle_t my_nvs_handle;
+// Set custom email parameter
+WiFiManagerParameter custom_email("email", "Enter Email", email, EMAIL_MAX_LENGTH, "type='email' required placeholder='example@example.com'");
 
+
+nvs_handle_t my_nvs_handle;
 unsigned long tiempoArranque;
 
 // relay status 0-off / 1-on
@@ -107,6 +119,7 @@ int32_t rssi = 0;
 int BLIND_DIST = 22;
 String FLOW_EVENTS = "";
 
+int Reset_BTN_Count = 0;
 enum ConfigStatus {
   WIFI_SETUP,
   WIFI
@@ -160,7 +173,10 @@ void setup() {
       Serial.println("Done opening nvs handler");
   }
 
-  load_private_key();
+  // Add parameter to WiFiManager
+  wm.addParameter(&custom_email);
+  // Set config save callback
+  wm.setSaveConfigCallback(saveConfigCallback);
 
   RelayStatus = 0;
   ALGO = 0;
@@ -172,24 +188,56 @@ void setup() {
   MIN_FLOW_MM_X_MIN = 0;
   IDLE_FLOW_EVENT_TIME = 0;
   IDLE_FLOW_EVENT_LAST_DIST = 0;
+  Reset_BTN_Count = 0;
 
   past_flow_time = millis();
   past_percent = 0;
   IS_WAITING = false;
 
   LAST_DATA_TIME = millis();
-  load_local_settings();
   IDLE_CONNECTION_SECS = 0;
+
+  load_local_settings();
+  load_private_key();
 
   if(CurrentStatus == WIFI_SETUP){
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_7x14B_tr);
     u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER, 0,  2,  2, "WiFi Reset/Setup" );
     u8g2.sendBuffer();
-    SetupResetWifi();
-  }
 
-  ConnectWifi();
+    SetupResetWifi();
+    
+  }else{
+    ConnectWifi();
+  }
+  
+}
+
+
+void saveConfigCallback() {
+  Serial.println("Enter saveConfigCallback");
+  // Placeholder for additional code to handle saving to persistent storage, if needed
+
+  // Guardar el email en EEPROM
+  const char *newEmail = custom_email.getValue();
+  strncpy(email, newEmail, sizeof(email) - 1); // Copiar el nuevo valor
+  email[sizeof(email) - 1] = '\0'; // Asegurar que termina con '\0'
+
+
+  if(myStrlen(email) >= 7 ){
+
+    #ifdef DEBUG
+      Serial.print("Email to linked: ");
+      Serial.println(email);
+    #else
+       delay(10);
+    #endif
+  }else{
+    Serial.print("Invalid email: ");
+    Serial.println(email);
+    strcpy(email, "-");
+  }
 
 }
 
@@ -206,17 +254,18 @@ int myStrlen(const char* str) {
 
 void load_private_key(){
 
-  size_t required_size;
+  size_t required_size = 0;
   nvs_get_str(my_nvs_handle, "PrivateKey", NULL, &required_size);
-  if (required_size != 0) {
+  if (required_size != 0 and required_size > 10) {
     char* tmp_key = (char*)malloc(required_size);
     nvs_get_str(my_nvs_handle, "PrivateKey", tmp_key, &required_size);
-    api_key = tmp_key;
+    strcpy(api_key, tmp_key);  
+    free(tmp_key);
     
     Serial.print("Private Key loaded from memory: ");
     Serial.println(api_key);
 
-  }else if(api_key != "-"){
+  }else if(strcmp(api_key, "-") != 0){
     nvs_set_str(my_nvs_handle, "PrivateKey", api_key);
     nvs_commit(my_nvs_handle);
 
@@ -224,9 +273,16 @@ void load_private_key(){
     Serial.println(api_key);
   }
 
-  if(myStrlen(api_key) < 10){
+  if(myStrlen(api_key) < 10 && CurrentStatus != WIFI_SETUP){
     Serial.print("ERROR: Short API KEY: ");
     Serial.println(api_key);
+
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_7x14B_tr);
+    u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER, 0,  2,  2, "Invalid Key!" );
+    u8g2.sendBuffer();
+    sleep(7);
+
     esp_system_abort("restart_after_wakeup");
   }
 
@@ -245,11 +301,11 @@ void loop() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_7x14B_tr);
 
-  if(!DEV_MODE && millis() <= 120000){
-    Serial.println("Waiting 2 min. after start 4 safetry");
+  if(!DEV_MODE && millis() <= 60000){
+    Serial.println("Waiting 1 min. after start 4 safe-try");
 
     u8g2.setFont(u8g2_font_helvR08_tr);
-    u8g2.drawButtonUTF8(62, 30, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Waiting 2 min." );
+    u8g2.drawButtonUTF8(62, 30, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Waiting 1 min." );
 
     u8g2.sendBuffer();
 
@@ -628,6 +684,7 @@ void RelayOn(){
   digitalWrite(RELAY_PIN_1, HIGH); // Activamos el primer relé
   Serial.println("Relay ON");
   RelayStatus = 1;
+  Reset_BTN_Count = 0;
 
   IS_WAITING = false;
   IDLE_FLOW_EVENT_TIME = 0;
@@ -639,6 +696,7 @@ void RelayOff(){
   Serial.println("Relay OFF");
   RelayStatus = 0;
   ACTION = 0;
+  Reset_BTN_Count = 0;
 }
 
 void load_local_settings(){
@@ -761,6 +819,168 @@ String splitString(const String &dataString, int *resultArray, int arraySize) {
   }
 
   return sensor_key;
+}
+
+
+String urlEncode(String str) {
+  String encoded = "";
+  char c;
+  char hex[4]; // Para almacenar el formato %XX
+
+  for (size_t i = 0; i < str.length(); i++) {
+    c = str.charAt(i);
+
+    // Codificar caracteres especiales según el estándar
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded += c; // Dejar caracteres seguros sin cambios
+    } else {
+      sprintf(hex, "%%%02X", c); // Convertir a %XX
+      encoded += hex;
+    }
+  }
+
+  return encoded;
+}
+
+
+bool HttpRegDevice(){
+
+  // Check for successful connection
+  if (WiFi.status() == WL_CONNECTED) {
+    #ifdef DEBUG
+      Serial.println("Connected to WiFi");
+    #else
+       delay(10);
+    #endif
+
+    long timeout = 15000;
+
+    rssi = WiFi.RSSI();
+    Serial.print("Signal strength (RSSI): ");
+    Serial.print(rssi);
+    Serial.println(" dBm");
+
+    HTTPClient https;
+    https.setTimeout(timeout);
+    https.setConnectTimeout(timeout);
+
+    #ifdef DEBUG
+      Serial.print("[HTTPS] begin...\n");
+    #else
+       delay(10);
+    #endif
+
+
+    char urlout[355];
+
+    String email_encoded = urlEncode(email);
+    // we are going to start here
+    strcpy(urlout, host_link_url);
+    strcat(urlout, "?key=");
+    strcat(urlout, api_key);
+    strcat(urlout, "&dtype=3");
+    strcat(urlout, "&email=");
+    strcat(urlout, email_encoded.c_str());
+
+    if (https.begin(urlout)) {  // HTTPS
+
+      //https.setVerify .setVerify(true);
+      //https.setReuse(false);
+
+      // Add a custom HTTP header (replace "Your-Header" and "Header-Value" with your actual header and value)
+      https.addHeader("FW-Version", (String)FIRMW_VER);
+      https.addHeader("RSSI", (String)rssi);
+
+      https.setTimeout(timeout);
+
+      // prepare to read response headers
+      const char *headerKeys[] = {"fw-version", "wpl-key"}; // Agrega todas las claves de los encabezados que deseas recopilar
+      const size_t headerKeysCount = sizeof(headerKeys) / sizeof(headerKeys[0]);
+      // Recopila las cabeceras HTTP especificadas
+      https.collectHeaders(headerKeys, headerKeysCount);
+
+      // start connection and send HTTP header
+      int httpCode = https.GET();
+
+      // httpCode will be negative on error
+      if (httpCode > 0) {
+        // HTTP header has been send and Server response header has been handled
+
+        #ifdef DEBUG
+          Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+        #else
+          delay(10);
+        #endif
+
+        // file found at server
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+
+          String payload = https.getString();
+
+          #ifdef DEBUG
+            Serial.print("response payload: ");
+            Serial.println(payload);
+          #else
+            delay(10);
+          #endif
+
+          if(payload == "OK"){
+
+            String latest_relay_fw = https.header("fw-version");
+            String wlp_key = https.header("wpl-key");
+
+            #ifdef DEBUG
+              Serial.print("assigned wpl-key: ");
+              Serial.println(wlp_key);
+              Serial.print("Old api_key: ");
+              Serial.println(api_key);
+            #endif
+
+            if(wlp_key.length() >= 7 && strcmp(api_key, "-") == 0)
+            {
+                strcpy(api_key, wlp_key.c_str());
+                load_private_key();
+            }
+            #ifdef DEBUG
+              else{
+                Serial.println("Invalid key status");
+              }
+            #endif
+            
+
+          }
+
+          https.end();
+          return true;
+
+        }
+      } else {
+        #ifdef DEBUG
+          Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
+        #else
+          delay(10);
+        #endif
+        https.end();
+        return false;
+      }
+
+    } else {
+      #ifdef DEBUG
+        Serial.printf("[HTTPS] Unable to connect\n");
+      #else
+       delay(10);
+    #endif
+      return false;
+    }
+
+  } else {
+    #ifdef DEBUG
+      Serial.println("Failed to connect to WiFi");
+    #else
+       delay(10);
+    #endif
+  }
+  return false;
 }
 
 
@@ -911,31 +1131,43 @@ bool SetupResetWifi(){
   //WiFi.setTxPower(WIFI_POWER_8_5dBm);
   WiFi.mode(WIFI_AP); // explicitly set mode
   //WiFi.setTxPower(WIFI_POWER_8_5dBm);
-  delay(250);
+  delay(50);
   
   wm.setCaptivePortalEnable(true);
 
   std::vector<const char *> menu = {"wifi","restart","exit"};
   wm.setMenu(menu);
 
-  // set configportal timeout 5 min
-  wm.setConfigPortalTimeout(300);
+  // set configportal timeout 50 min
+  wm.setConfigPortalTimeout(3000);
+  wm.setSaveConnectTimeout(20);
 
   if (!wm.startConfigPortal(WIFI_NAME, WIFI_PASSW)) {
     Serial.println("failed to connect and hit timeout");
 
-    delay(3000);
+    nvs_set_i32(my_nvs_handle, "0-status", (int32_t)WIFI_SETUP);
+    nvs_commit(my_nvs_handle);
+    CurrentStatus = WIFI_SETUP;
+    wm.resetSettings();
+
+    delay(300);
     //reset and try again, or maybe put it to deep sleep
     esp_system_abort("restart_after_wakeup");
-    delay(5000);
+    delay(500);
   }
 
+  delay(30);
+  if(myStrlen(email) > 7){
+    HttpRegDevice();
+  }
+
+  delay(50);
   nvs_set_i32(my_nvs_handle, "0-status", (int32_t)WIFI);
   nvs_commit(my_nvs_handle);
   CurrentStatus = WIFI;
 
   Serial.println("Setup Wifi Success");
-  delay(3000);
+  delay(50);
   esp_system_abort("restart_after_wakeup");
 
 }
@@ -948,6 +1180,12 @@ ICACHE_RAM_ATTR void botonPresionado() {
 
   Serial.println("El botón está presionado");
 
+  // req x3 times press the reset btn
+  Reset_BTN_Count = Reset_BTN_Count + 1;
+  if(Reset_BTN_Count < 3) {
+    return;
+  }
+
   nvs_set_i32(my_nvs_handle, "0-status", (int32_t)WIFI_SETUP);
   nvs_commit(my_nvs_handle);
 
@@ -956,7 +1194,7 @@ ICACHE_RAM_ATTR void botonPresionado() {
   //reset settings
   wm.resetSettings();
 
-  delay(500);
+  delay(50);
   esp_system_abort("restart_after_wakeup");
 
 }

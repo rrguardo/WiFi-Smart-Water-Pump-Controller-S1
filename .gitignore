@@ -1,6 +1,7 @@
 .idea/
 *.pyc
 *.FCBak
+SmartPumpControllerS1/build
 
 # Prerequisites
 *.d
