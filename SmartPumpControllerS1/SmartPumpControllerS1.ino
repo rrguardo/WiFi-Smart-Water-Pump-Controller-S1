@@ -50,13 +50,14 @@
 #define RELAY_PIN_1 0
 #define EMAIL_MAX_LENGTH 128
 #define DEBUG  // Comment this line to disable serial prints
+#define BLIND_MARGIN_EXTRA 2 // extra margin added
 
 // DEV MODE allow app update remote
 const bool DEV_MODE = false; // used for ON/OFF live-updates and other other safety instructions for easy development
 const bool LIVE_UPDATE = true; // used for ON/OFF live-updates and other other safety instructions for easy development
 
 const char* firmwareUrl = "https://waterlevel.pro/static/fw";
-int FIRMW_VER = 14;
+int FIRMW_VER = 15;
 
 // Pin del botón wifi-setup/reset
 const int pinBoton = 1;
@@ -94,6 +95,10 @@ int AUTO_ON = 0;
 int ACTION = 0; //0 none, -1 off, 1 on
 int IDLE_CONNECTION_SECS = 0; // calc. based on sensor pool-time
 int MIN_FLOW_MM_X_MIN = 0;
+int BLIND_DISTANCE = 22;
+String HOURS_OFF = "-";
+
+int Sensor5History[5] = {0, 0, 0, 0, 0};
 
 
 int sens_percent = 0; // filled percent
@@ -102,21 +107,17 @@ int sens_current_time = 0;
 
 int sensor_last_distance = 0;
 int sensor_last_pool_time = 0;
+int sens_event_last_time = 0;
 
 unsigned long LAST_DATA_TIME = 0;
 unsigned long IDLE_FLOW_EVENT_TIME = 0;
-unsigned long IDLE_FLOW_EVENT_TIME_UNIX = 0;
-int IDLE_FLOW_EVENT_LAST_DIST = 0;
+unsigned long relay_on_start_time = 0;
 bool IS_WAITING = false;
 
 // FLOW IDDLE VARIABLES
-unsigned long past_flow_time = 0;
-int past_percent = 0;
-const int IDLE_PERCENT = 2; // IDLE FRLOW CHECK REQUIRE MIN 2% variation
-const int IDLE_RECOVERY_SEC = 60*60*3; // IDLE RECOVERY TIME before try again after low flow detected (3 hours)
+const int IDLE_RECOVERY_SEC = 60*60*3; // IDLE RECOVERY TIME before try again after low flow detected (1 hours)
 int32_t rssi = 0;
 
-int BLIND_DIST = 22;
 String FLOW_EVENTS = "";
 
 int Reset_BTN_Count = 0;
@@ -187,11 +188,8 @@ void setup() {
   ACTION = 0;
   MIN_FLOW_MM_X_MIN = 0;
   IDLE_FLOW_EVENT_TIME = 0;
-  IDLE_FLOW_EVENT_LAST_DIST = 0;
   Reset_BTN_Count = 0;
 
-  past_flow_time = millis();
-  past_percent = 0;
   IS_WAITING = false;
 
   LAST_DATA_TIME = millis();
@@ -332,21 +330,18 @@ void loop() {
 
   if(ACTION == 1){
     ACTION = 0;
-    past_flow_time = millis();
     RelayOn();
 
     IS_WAITING = false;
     IDLE_FLOW_EVENT_TIME = 0;
-    IDLE_FLOW_EVENT_LAST_DIST = 0; 
   }
 
   if(ACTION == -1){
     ACTION = 0;
-    past_flow_time = millis();
     RelayOff();
   }
 
-  if(AUTO_OFF > 0 && sensor_last_distance > 0 && sensor_last_distance <= BLIND_DIST){
+  if(AUTO_OFF > 0 && sensor_last_distance > 0 && sensor_last_distance <= BLIND_DISTANCE){
     Serial.println("Top blind distance detected");
     RelayOff();
 
@@ -373,10 +368,6 @@ void loop() {
   if(ALGO == 1){
     DoAlgo1();
   }
-
-  if(ALGO == 2){
-    DoAlgo2();
-  }
   u8g2.sendBuffer();
   delay(10000); // Esperamos 10 segundos
 }
@@ -395,6 +386,28 @@ void drawLevel(int percentage) {
 
 }
 
+bool checkConsistency(const int arr[], int size, int threshold) {
+  // Check if last 2 sensor values have sense (>0 and diff < threshold)
+
+    Serial.println("checkConsistency");
+    PrintHistory();
+    // Check if there are at least two elements in the array
+    if (size < 2) {
+        return false; // Not enough elements to compare
+    }
+
+    // Get the last two values and calculate their absolute difference
+    int lastValue = arr[size - 1];
+    int secondLastValue = arr[size - 2];
+    if(lastValue <= 0 ||  secondLastValue <= 0){
+      return false; // not data yet
+    }
+    int difference = abs(lastValue - secondLastValue);
+
+    // Return true if the difference is within the threshold
+    return difference <= threshold;
+}
+
 
 int GetHour(int utcTimestamp, int gmt_number){
   // Apply the GMT-4 offset (4 hours behind UTC)
@@ -410,8 +423,21 @@ int GetHour(int utcTimestamp, int gmt_number){
   return tm.Hour;
 }
 
+
+void PrintHistory(){
+  #ifdef DEBUG
+    Serial.println("======================");
+          Serial.println("Sensor5History: ");
+
+          for (int i = 0; i <= 4; i++) {
+            Serial.println(Sensor5History[i]);
+          }
+      Serial.println("======================");
+  #endif
+}
+
 // ALGO #1 - try auto-start if capacity is under 30%, stop at 90%
-// use complex iddle flow detection based in speed [not working]
+// use simple iddle flow detection based in basic check
 void DoAlgo1(){
 
   /*
@@ -440,8 +466,18 @@ void DoAlgo1(){
   // Stop ALGO after 10 PM and before 9 AM
   if(sens_current_time > 0){
       int gtm_4_hour = GetHour(sens_current_time, 4);
-      if(gtm_4_hour >= 22 || gtm_4_hour <= 8){
-        Serial.println("Late night detected");
+      if(isHourInList(HOURS_OFF, gtm_4_hour)){
+        Serial.println("Off hours detected");
+
+        u8g2.sendBuffer();
+        delay(10000);
+        u8g2.clearBuffer();
+        u8g2.setFont(u8g2_font_7x14B_tr);
+        u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "WARNING!" );
+        u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Disabled Hours!" );
+        u8g2.sendBuffer();
+        delay(5000);
+
         RelayOff();
         return;
       }
@@ -473,210 +509,92 @@ void DoAlgo1(){
   // case: waiting after IDDLE FLOW
   if(IS_WAITING && (IDLE_FLOW_EVENT_TIME + IDLE_RECOVERY_SEC*1000) >= millis()){
     Serial.println("Waiting 3 hours for better flow");
+
+    u8g2.sendBuffer();
+    delay(10000);
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_7x14B_tr);
+    u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "WARNING!" );
+    u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Low Flow, Waiting!" );
+    u8g2.sendBuffer();
+    delay(5000);
+
     return;
   }else if(IS_WAITING){
+    Serial.println("Waiting done!");
     IS_WAITING = false;
     IDLE_FLOW_EVENT_TIME = 0;
-    IDLE_FLOW_EVENT_LAST_DIST = 0; 
   }
 
   // case: IDDLE FLOW 
   if(RelayStatus == 1 && MIN_FLOW_MM_X_MIN > 0 && sensor_last_distance > 0 && sensor_last_pool_time > 0){
-    Serial.print("IDDLE FLOW CHECK, IDLE_FLOW_EVENT_TIME: ");
-    Serial.println(IDLE_FLOW_EVENT_TIME);
 
-    Serial.print("IDDLE FLOW CHECK, sensor_last_pool_time: ");
-    Serial.println(sensor_last_pool_time);
+    unsigned long runing_time = millis() - relay_on_start_time;
+    if(MIN_FLOW_MM_X_MIN*60000 < runing_time){
 
-    Serial.print("IDDLE FLOW CHECK, millis: ");
-    Serial.println(millis());
+      PrintHistory();
 
-    if(IDLE_FLOW_EVENT_TIME == 0 && IDLE_FLOW_EVENT_LAST_DIST ==0 && sensor_last_distance > 0){
-      Serial.print("IDDLE FLOW REBOOT DETECTED");
-      // update event data
-      IDLE_FLOW_EVENT_TIME = millis();
-      IDLE_FLOW_EVENT_TIME_UNIX = sens_event_time;
-      IDLE_FLOW_EVENT_LAST_DIST = sensor_last_distance;
-
-    }
-
-    // collect dist-sample based on sensor pool time
-    if((IDLE_FLOW_EVENT_TIME + sensor_last_pool_time*2000 + 30000) < millis()){
-      Serial.println("IDDLE FLOW CHECK LV2");
-
-      //check is not first time
-      if(IDLE_FLOW_EVENT_TIME != 0 && IDLE_FLOW_EVENT_LAST_DIST !=0 && sensor_last_distance > 0){
-        int diff_dist = (sensor_last_distance - IDLE_FLOW_EVENT_LAST_DIST)*10;
-        int diff_time = IDLE_FLOW_EVENT_TIME_UNIX - sens_event_time; // unix sec. diff.
-        float speed = (float)diff_dist / ((float)diff_time/60.0);
-        int int_speed = round(speed);
-
-        Serial.println("*************************************");
-        Serial.print("int_speed: ");
-        Serial.println(int_speed);
-
-        if(int_speed <= MIN_FLOW_MM_X_MIN){
-          Serial.println("slow flow detected");
-          RelayOff();
-          IS_WAITING = true;
-          return;
-        }
+      if(!FlowHistoryGrow(Sensor5History, 5)){
+        IDLE_FLOW_EVENT_TIME = millis();
+        RelayOff();
+        IS_WAITING = true;
+        Serial.println("Slow flow detected");
+        return;
       }
-
-      // update event data
-      IDLE_FLOW_EVENT_TIME = millis();
-      IDLE_FLOW_EVENT_TIME_UNIX = sens_event_time;
-      IDLE_FLOW_EVENT_LAST_DIST = sensor_last_distance;
-    }
-
+      
+      }
+    
   }
 
+  
   sens_current_time = 0;
   sens_event_time = 0;
 
   Serial.print("sens_percent: ");
   Serial.println(sens_percent);
 
-  if(sens_percent <= START_LEVEL && RelayStatus == 0 && AUTO_ON == 1){
+  if(sens_percent <= START_LEVEL && RelayStatus == 0 && AUTO_ON == 1 && checkConsistency(Sensor5History, 5, 20)){
     Serial.println("AUTO_ON ON");
     RelayOn();
   }
 
-  if(sens_percent >= END_LEVEL && RelayStatus == 1 && AUTO_OFF == 1){
+  if(sens_percent >= END_LEVEL && RelayStatus == 1 && AUTO_OFF == 1 && checkConsistency(Sensor5History, 5, 20)){
     Serial.println("AUTO_OFF OFF");
     RelayOff();
   }
 }
 
-// ALGO #2 - try auto-start if capacity is under 30%, stop at 90%
-// use simple iddle flow detection based in basic check
-void DoAlgo2(){
 
-  /*
-  RelayStatus = 0;
-  ALGO = 0;
-  START_LEVEL = 0;
-  END_LEVEL = 0;
-  AUTO_OFF = 0;
-  AUTO_ON = 0;
-  ACTION = 0;
+bool FlowHistoryGrow(const int arr[], int size) {
 
-  MIN_FLOW_MM_X_MIN
-  sensor_last_distance
-  sensor_last_pool_time 
-  */
- 
-  if(RelayStatus == 1 && IDLE_CONNECTION_SECS > 0 && (millis() - LAST_DATA_TIME >= IDLE_CONNECTION_SECS*1000)){
-    Serial.println("Long iddle connection time");
-    RelayStatus = 0;
-    sens_current_time = 0;
-    sens_event_time = 0;
-    RelayOff();
-    return;
-  }
+  for (int i = 1; i < size - 1; i++) { // Iterate from the second to the second-last element
+        bool hasGreaterLeft = false;  // To check if there's a greater number on the left
 
-  // Stop ALGO after 10 PM and before 9 AM
-  if(sens_current_time > 0){
-      int gtm_4_hour = GetHour(sens_current_time, 4);
-      if(gtm_4_hour >= 22 || gtm_4_hour <= 8){
-        Serial.println("Late night detected");
-        RelayOff();
-        return;
-      }
-  }
-  
-  if(sens_current_time == 0 || sens_event_time == 0 ){
-      Serial.println("Not sensor data detected!");
-      sens_current_time = 0;
-      sens_event_time = 0;
-      return;
-  }
-
-  if(IDLE_CONNECTION_SECS != 0){
-    if(sens_current_time - sens_event_time > IDLE_CONNECTION_SECS){
-      Serial.println("Idle sensor detected!");
-      sens_current_time = 0;
-      sens_event_time = 0;
-      RelayOff();
-      return;
-    }
-  }
-
-  /*  
-    MIN_FLOW_MM_X_MIN
-    sensor_last_distance
-    sensor_last_pool_time 
-  */
-
-  // case: waiting after IDDLE FLOW
-  if(IS_WAITING && (IDLE_FLOW_EVENT_TIME + IDLE_RECOVERY_SEC*1000) >= millis()){
-    Serial.println("Waiting 3 hours for better flow");
-    return;
-  }else if(IS_WAITING){
-    IS_WAITING = false;
-    IDLE_FLOW_EVENT_TIME = 0;
-    IDLE_FLOW_EVENT_LAST_DIST = 0; 
-  }
-
-  // case: IDDLE FLOW 
-  if(RelayStatus == 1 && MIN_FLOW_MM_X_MIN > 0 && sensor_last_distance > 0 && sensor_last_pool_time > 0){
-    Serial.print("IDDLE FLOW CHECK, IDLE_FLOW_EVENT_TIME: ");
-    Serial.println(IDLE_FLOW_EVENT_TIME);
-
-    Serial.print("IDDLE FLOW CHECK, sensor_last_pool_time: ");
-    Serial.println(sensor_last_pool_time);
-
-    Serial.print("IDDLE FLOW CHECK, millis: ");
-    Serial.println(millis());
-
-    if(IDLE_FLOW_EVENT_TIME == 0 && IDLE_FLOW_EVENT_LAST_DIST == 0 && sensor_last_distance > 0){
-      Serial.print("IDDLE FLOW REBOOT DETECTED");
-      // update event data
-      IDLE_FLOW_EVENT_TIME = millis();
-      IDLE_FLOW_EVENT_TIME_UNIX = sens_event_time;
-      IDLE_FLOW_EVENT_LAST_DIST = sensor_last_distance;
-
-    }
-
-    // collect dist-sample based on sensor pool time
-    if((IDLE_FLOW_EVENT_TIME + sensor_last_pool_time*2000 + 30000) < millis()){
-      Serial.println("IDDLE FLOW CHECK LV2");
-
-      //check is not first time
-      if(IDLE_FLOW_EVENT_TIME != 0 && IDLE_FLOW_EVENT_LAST_DIST !=0 && sensor_last_distance > 0){
-        int diff_dist = (sensor_last_distance - IDLE_FLOW_EVENT_LAST_DIST)*10;
-        
-        if(diff_dist <= 0){
-          Serial.println("slow flow detected");
-          RelayOff();
-          IS_WAITING = true;
-          return;
+        // Check if the current element is zero
+        if (arr[i] == 0) {
+            return true;
         }
-      }
 
-      // update event data
-      IDLE_FLOW_EVENT_TIME = millis();
-      IDLE_FLOW_EVENT_TIME_UNIX = sens_event_time;
-      IDLE_FLOW_EVENT_LAST_DIST = sensor_last_distance;
+        // Check for a greater number on the left
+        for (int j = 0; j < i; j++) {
+            if (arr[j] > arr[i]) {
+                hasGreaterLeft = true;
+                break;
+            }
+        }
+
+        // If both conditions are met, return true
+        if (hasGreaterLeft) {
+            return true;
+        }
     }
 
-  }
+    // Check if the first is zero
+    if (arr[0] == 0 ) {
+        return true;
+    }
 
-  sens_current_time = 0;
-  sens_event_time = 0;
-
-  Serial.print("sens_percent: ");
-  Serial.println(sens_percent);
-
-  if(sens_percent <= START_LEVEL && RelayStatus == 0 && AUTO_ON == 1){
-    Serial.println("AUTO_ON ON");
-    RelayOn();
-  }
-
-  if(sens_percent >= END_LEVEL && RelayStatus == 1 && AUTO_OFF == 1){
-    Serial.println("AUTO_OFF OFF");
-    RelayOff();
-  }
+    return false; // Return false if no element meets the conditions
 }
 
 
@@ -688,7 +606,8 @@ void RelayOn(){
 
   IS_WAITING = false;
   IDLE_FLOW_EVENT_TIME = 0;
-  IDLE_FLOW_EVENT_LAST_DIST = 0;
+  relay_on_start_time = millis();
+
 }
 
 void RelayOff(){
@@ -758,7 +677,7 @@ bool ConnectWifi(){
 }
 
 
-void SetLocalConf(int _ALGO, int _START_LEVEL, int _END_LEVEL, int _AUTO_OFF, int _AUTO_ON, int _MIN_FLOW_MM_X_MIN, int _ACTION){
+void SetLocalConf(int _ALGO, int _START_LEVEL, int _END_LEVEL, int _AUTO_OFF, int _AUTO_ON, int _MIN_FLOW_MM_X_MIN, int _ACTION, int _BLIND_DISTANCE, String _HOURS_OFF){
 
   Serial.print("SetLocalConf: _MIN_FLOW_MM_X_MIN: ");
   Serial.println(_MIN_FLOW_MM_X_MIN);
@@ -792,6 +711,12 @@ void SetLocalConf(int _ALGO, int _START_LEVEL, int _END_LEVEL, int _AUTO_OFF, in
     MIN_FLOW_MM_X_MIN = _MIN_FLOW_MM_X_MIN;
   }
 
+  if(_BLIND_DISTANCE >= 0){
+    BLIND_DISTANCE = _BLIND_DISTANCE + BLIND_MARGIN_EXTRA;
+  }
+
+  HOURS_OFF = _HOURS_OFF;
+
 }
 
 
@@ -819,6 +744,24 @@ String splitString(const String &dataString, int *resultArray, int arraySize) {
   }
 
   return sensor_key;
+}
+
+
+bool isHourInList(String hourList, int hour) {
+  // Validate that the hour is within the allowed range
+  if (hour < 0 || hour > 23) {
+    return false;
+  }
+
+  // Convert the hour to a string
+  String hourStr = String(hour);
+
+  // Add commas to handle matches at the start, middle, and end of the list
+  String formattedList = "," + hourList + ",";
+  String formattedHour = "," + hourStr + ",";
+
+  // Check if the formatted hour is in the formatted list
+  return formattedList.indexOf(formattedHour) != -1;
 }
 
 
@@ -1026,13 +969,12 @@ bool GetRemoteSettings(){
       
       https.setTimeout(timeout);
 
-
       // prepare to read response headers
 
       // Agrega todas las claves de los encabezados que deseas recopilar
       const char *headerKeys[] = {"percent", "event-time", "current-time", "fw-version", "distance", "pool-time",
-        "ALGO", "START_LEVEL", "END_LEVEL", "AUTO_OFF", "AUTO_ON", "MIN_FLOW_MM_X_MIN", "ACTION",
-      }; 
+        "ALGO", "START_LEVEL", "END_LEVEL", "AUTO_OFF", "AUTO_ON", "MIN_FLOW_MM_X_MIN", "ACTION", "BLIND_DISTANCE", "HOURS_OFF"
+      };
 
       const size_t headerKeysCount = sizeof(headerKeys) / sizeof(headerKeys[0]);
       // Recopila las cabeceras HTTP especificadas
@@ -1079,6 +1021,16 @@ bool GetRemoteSettings(){
             
             sens_percent = sensor_percent.toInt();
             sens_event_time = sensor_event_time.toInt();
+
+            if(sens_event_time != sens_event_last_time){
+              sens_event_last_time = sens_event_time;
+
+              for (int i = 0; i < 4; i++) {
+                  Sensor5History[i] = Sensor5History[i + 1];
+              }
+              Sensor5History[4] = sensor_distance.toInt();
+            }
+            
             sens_current_time = sensor_current_time.toInt();
 
             sensor_last_distance = sensor_distance.toInt();
@@ -1096,7 +1048,8 @@ bool GetRemoteSettings(){
             }
 
             SetLocalConf(https.header("ALGO").toInt(), https.header("START_LEVEL").toInt(), https.header("END_LEVEL").toInt(), 
-              https.header("AUTO_OFF").toInt(), https.header("AUTO_ON").toInt(), https.header("MIN_FLOW_MM_X_MIN").toInt(), https.header("ACTION").toInt());
+              https.header("AUTO_OFF").toInt(), https.header("AUTO_ON").toInt(), https.header("MIN_FLOW_MM_X_MIN").toInt(), 
+              https.header("ACTION").toInt(), https.header("BLIND_DISTANCE").toInt(), https.header("HOURS_OFF"));
 
           }else{
             Serial.println("Response error!");
