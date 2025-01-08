@@ -2,7 +2,7 @@
 
 ![PCB](images/S1_Controller_git.png)
 
-Introduction
+## Introduction
 
 The [WiFi Smart Water Pump Controller S1](https://waterlevel.pro/products/WiFi-Smart-Water-Pump-Controller-S1)  is an innovative device 
 engineered to provide seamless control of water pumps through WiFi connectivity. 
@@ -52,7 +52,7 @@ directly from **JLCPCB** and **LCSC** services.
 
 This devide use ESP32-C3 microcontroller can use Arduino IDE to flash/upload microcontroller code, using **ESP32C3 Dev Module** as board.
 
-[Download Latest Firmware Builds Here](SmartPumpControllerS1/)
+[Download Latest Firmware Builds Here](SmartPumpControllerS1/firmwares/)
 
 ---
 ## FreeCad 3D printable case components
