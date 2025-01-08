@@ -122,7 +122,7 @@ may arise from the use of this project.
 ---
 
 <div align="center">
-  <h5>Designed in the Dominican Republic 2024</h5>
+  <h5>Designed in the Dominican Republic 2024-2025</h5>
   <img src="images/rd.gif" alt="RD" width="70px" />
 </div>
 
