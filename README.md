@@ -1,6 +1,6 @@
 # WiFi Smart Water Pump Controller S1
 
-![Smart Water Pump Controller S1](images/CShow1.gif)
+![PCB](images/S1_Controller_git.png)
 
 Introduction
 
@@ -11,7 +11,12 @@ offers a comprehensive solution for managing water levels and automating pump op
 Whether for residential, agricultural, or industrial applications, it enables efficient and remote 
 management of water systems.
 
-Please note that this is an incomplete ongoing project. software part are yet uncompleted.
+
+The system is cloud-connected, requiring an internet connection, 
+and is designed for reliable, continuous operation. For more details,
+refer to the [full features page](https://waterlevel.pro/products/WiFi-Smart-Water-Pump-Controller-S1).
+
+![PCB](images/HowWorksS1Controller.png)
 
 The project is open source and open hardware, licensed under GPLv3. All hardware, software, and
 3D printable components were designed from scratch by me, **Raul Rodriguez Guardo**, and are released 
@@ -47,7 +52,7 @@ directly from **JLCPCB** and **LCSC** services.
 
 This devide use ESP32-C3 microcontroller can use Arduino IDE to flash/upload microcontroller code, using **ESP32C3 Dev Module** as board.
 
-Before upload the code, generate a new private and public keys in developer zone at https://waterlevel.pro/settings  (TODO)
+[Download Latest Firmware Builds Here](SmartPumpControllerS1/)
 
 ---
 ## FreeCad 3D printable case components
@@ -57,6 +62,7 @@ Before upload the code, generate a new private and public keys in developer zone
 For more details about important 3d printing recommendations 
  [read this tips](3dcase/3DPrintReadme.md).
 
+![Smart Water Pump Controller S1](images/CShow1.gif)
 
 ![Smart Water Pump Controller S1](images/2.png)
 
@@ -65,13 +71,45 @@ For more details about important 3d printing recommendations
 ![Smart Water Pump Controller S1](images/1.png)
 
 ---
-# TODO:
 
-* check case when internet is lost and pump on
-* automatic device link
-* improve the web UI
-* minimal opensource server sample
-* ...
+### No 3D Printer? No Problem! Easily Print Parts Using Online 3D Printing Service
+
+| **3D Print Provider**             | **Recommended Materials for Outdoors**                | **Approximate Price**        | **Print Quality**               | **Delivery Options**          | **Comments**                                              |
+|--------------------------|-------------------------------------------------------|------------------------------|----------------------------------|-------------------------------|-----------------------------------------------------------|
+| **JLCPCB (JLC3DP)**       | Nylon (PA12)                                          | Low to Medium                 | High for resin and MJF           | International, economical      | Great value for money, lacks PETG or ASA options           |
+| **Shapeways**             | Nylon, Stainless Steel, Aluminum                      | Medium to High                | Very high, detailed              | International, fast            | Ideal for high-detail projects and outdoor durable parts   |
+| **Sculpteo**              | Nylon (PA12), Aluminum, Carbon-Reinforced Nylon       | Medium                        | High                             | International, fast options     | Wide range of materials, good for durable prototypes       |
+| **3D Hubs**               | PETG, ABS, Nylon, Carbon Fiber-Reinforced Materials   | Medium                        | High, varies by local provider   | International, varies           | Global network, quality and delivery times vary by provider|
+| **Craftcloud**            | PETG, Nylon, ASA, Carbon Fiber-Reinforced Materials   | Medium                        | High, varies by provider         | International, varies           | Service aggregator, good price comparison across providers |
+| **Materialise**           | Nylon (PA12), Carbon-Reinforced Nylon, Metals         | High                          | Very high, industrial focus      | International, fast             | Focus on industrial and professional applications          |
+| **Xometry**               | Nylon, ABS, PETG, Aluminum, Carbon-Reinforced Nylon   | Medium to High                | Very high, professional focus    | International, fast             | Ideal for custom manufacturing and durable industrial parts|
+
+Choose durable materials like **PETG**, and set **infill at 60%** or higher for added strength. Just upload the 3D files and get everything printed and shipped to you!
+
+---
+## User Installation And Usage Manual
+
+The [installation manual](https://waterlevel.pro/manuals/WiFi-Smart-Water-Pump-Controller-S1) provides 
+detailed instructions on setting up the **WiFi Smart Water Pump Controller S1**. 
+Be sure to [read all instructions](https://waterlevel.pro/manuals/WiFi-Smart-Water-Pump-Controller-S1) 
+carefully before proceeding with the installation to ensure proper 
+setup and functionality.
+
+[WiFi Smart Water Pump Controller S1 , User Manual](https://waterlevel.pro/manuals/WiFi-Smart-Water-Pump-Controller-S1)
+
+---
+
+## What parts are opensource?
+
+* All the hardware part
+  * Electronics part: PCB, schematic.
+  * Printable 3D Case
+* Firmware software
+
+The server side (cloud services) that use the device are not 
+included in this project or git repo and are not opensource.
+
+---
 
 ## Disclaimer
 

@@ -57,7 +57,7 @@ const bool DEV_MODE = false; // used for ON/OFF live-updates and other other saf
 const bool LIVE_UPDATE = true; // used for ON/OFF live-updates and other other safety instructions for easy development
 
 const char* firmwareUrl = "https://waterlevel.pro/static/fw";
-int FIRMW_VER = 15;
+int FIRMW_VER = 17;
 
 // Pin del botón wifi-setup/reset
 const int pinBoton = 1;
@@ -88,6 +88,7 @@ unsigned long tiempoArranque;
 int RelayStatus = 0;
 
 int ALGO = 0; // 0 none, 1 (llenar a 90% al ancanzar 30%)
+int SAFE_MODE = 1;
 int START_LEVEL = 0; // in %
 int END_LEVEL = 0; // in %
 int AUTO_OFF = 0;
@@ -98,7 +99,7 @@ int MIN_FLOW_MM_X_MIN = 0;
 int BLIND_DISTANCE = 22;
 String HOURS_OFF = "-";
 
-int Sensor5History[5] = {0, 0, 0, 0, 0};
+int Sensor5History[5] = {-1, -1, -1, -1, -1};
 
 
 int sens_percent = 0; // filled percent
@@ -128,6 +129,26 @@ enum ConfigStatus {
 
 ConfigStatus CurrentStatus = WIFI_SETUP;
 
+enum EventLogs {
+  NO_EVENT,
+  BLIND_AREA,
+  BLIND_AREA_DANGER,
+  NOT_FLOW,
+  OFFLINE,
+  IDDLE_SENSOR,
+  END_LEVEL_EVENT,
+  START_LEVEL_EVENT,
+  SETUP_WIFI,
+  BOOT,
+  PUMP_ON,
+  PUMP_OFF,
+  DATA_POST_FAIL,
+  BTN_PRESS,
+  SENSOR_FAULT
+};
+
+EventLogs EventsArray[5] = {NO_EVENT, NO_EVENT, NO_EVENT, NO_EVENT, NO_EVENT};
+
 
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /*clock=*/9, /*data=*/8, U8X8_PIN_NONE);
 
@@ -149,6 +170,7 @@ void setup() {
 
   // Inicializamos la comunicación serial para debug (opcional)
   Serial.begin(115200);
+  AddEvent(BOOT);
 
   u8g2.begin();
 
@@ -181,6 +203,7 @@ void setup() {
 
   RelayStatus = 0;
   ALGO = 0;
+  SAFE_MODE = 0;
   START_LEVEL = 0;
   END_LEVEL = 0;
   AUTO_OFF = 0;
@@ -204,6 +227,7 @@ void setup() {
     u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER, 0,  2,  2, "WiFi Reset/Setup" );
     u8g2.sendBuffer();
 
+    AddEvent(SETUP_WIFI);
     SetupResetWifi();
     
   }else{
@@ -315,12 +339,13 @@ void loop() {
 
   char textWithInt2[100]; 
   sprintf(textWithInt2, "Level: %d %%", sens_percent);
-  u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER, 0,  2,  2, textWithInt2 );
+  u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER, 0,  2,  2, textWithInt2);
 
   drawLevel(sens_percent);
   
   if(IDLE_CONNECTION_SECS != 0){
     if(sens_current_time - sens_event_time > IDLE_CONNECTION_SECS){
+        AddEvent(IDDLE_SENSOR);
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_7x14B_tr);
         u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "WARNING!" );
@@ -341,7 +366,39 @@ void loop() {
     RelayOff();
   }
 
+  if(SAFE_MODE == 1 && checkConsistency(Sensor5History, 5, 20) && sensor_last_distance <= (BLIND_DISTANCE - BLIND_MARGIN_EXTRA)){
+    Serial.println("Danger blind distance detected");
+    AddEvent(BLIND_AREA_DANGER);
+    if(AUTO_OFF){
+      RelayOff();
+
+      u8g2.clearBuffer();
+      u8g2.setFont(u8g2_font_7x14B_tr);
+      u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "AUTO OFF!" );
+      u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Smart Mode OFF!" );
+
+      delay(20000); // Esperamos 20 segundos
+    }
+  }
+
+  if(SAFE_MODE == 1 && Sensor5History[4] == 0 && Sensor5History[5] == 0){
+    Serial.println("Danger blind distance or sensor fail detected");
+    AddEvent(BLIND_AREA_DANGER);
+    AddEvent(SENSOR_FAULT);
+    if(AUTO_OFF){
+      RelayOff();
+
+      u8g2.clearBuffer();
+      u8g2.setFont(u8g2_font_7x14B_tr);
+      u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "AUTO OFF!" );
+      u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Smart Mode OFF!" );
+
+      delay(20000); // Esperamos 20 segundos
+    }
+  }
+
   if(AUTO_OFF > 0 && sensor_last_distance > 0 && sensor_last_distance <= BLIND_DISTANCE){
+    AddEvent(BLIND_AREA);
     Serial.println("Top blind distance detected");
     RelayOff();
 
@@ -354,6 +411,7 @@ void loop() {
   }
 
   if(AUTO_OFF > 0 && IDLE_CONNECTION_SECS != 0 &&  sens_current_time > 0 && sens_event_time > 0 && sens_current_time - sens_event_time > IDLE_CONNECTION_SECS){
+    AddEvent(OFFLINE);
     Serial.println("Sensor offline AUTO_OFF");
     RelayOff();
 
@@ -387,7 +445,7 @@ void drawLevel(int percentage) {
 }
 
 bool checkConsistency(const int arr[], int size, int threshold) {
-  // Check if last 2 sensor values have sense (>0 and diff < threshold)
+  // Check if last 2 sensor values have sense (>=0 and diff < threshold)
 
     Serial.println("checkConsistency");
     PrintHistory();
@@ -399,7 +457,7 @@ bool checkConsistency(const int arr[], int size, int threshold) {
     // Get the last two values and calculate their absolute difference
     int lastValue = arr[size - 1];
     int secondLastValue = arr[size - 2];
-    if(lastValue <= 0 ||  secondLastValue <= 0){
+    if(lastValue < 0 ||  secondLastValue < 0){
       return false; // not data yet
     }
     int difference = abs(lastValue - secondLastValue);
@@ -427,12 +485,12 @@ int GetHour(int utcTimestamp, int gmt_number){
 void PrintHistory(){
   #ifdef DEBUG
     Serial.println("======================");
-          Serial.println("Sensor5History: ");
+      Serial.println("Sensor5History: ");
 
-          for (int i = 0; i <= 4; i++) {
-            Serial.println(Sensor5History[i]);
-          }
-      Serial.println("======================");
+      for (int i = 0; i <= 4; i++) {
+        Serial.println(Sensor5History[i]);
+      }
+    Serial.println("======================");
   #endif
 }
 
@@ -455,6 +513,7 @@ void DoAlgo1(){
   */
  
   if(RelayStatus == 1 && IDLE_CONNECTION_SECS > 0 && (millis() - LAST_DATA_TIME >= IDLE_CONNECTION_SECS*1000)){
+    AddEvent(OFFLINE);
     Serial.println("Long iddle connection time");
     RelayStatus = 0;
     sens_current_time = 0;
@@ -492,6 +551,7 @@ void DoAlgo1(){
 
   if(IDLE_CONNECTION_SECS != 0){
     if(sens_current_time - sens_event_time > IDLE_CONNECTION_SECS){
+      AddEvent(IDDLE_SENSOR);
       Serial.println("Idle sensor detected!");
       sens_current_time = 0;
       sens_event_time = 0;
@@ -524,6 +584,7 @@ void DoAlgo1(){
     Serial.println("Waiting done!");
     IS_WAITING = false;
     IDLE_FLOW_EVENT_TIME = 0;
+    RelayOn();
   }
 
   // case: IDDLE FLOW 
@@ -535,6 +596,7 @@ void DoAlgo1(){
       PrintHistory();
 
       if(!FlowHistoryGrow(Sensor5History, 5)){
+        AddEvent(NOT_FLOW);
         IDLE_FLOW_EVENT_TIME = millis();
         RelayOff();
         IS_WAITING = true;
@@ -554,11 +616,13 @@ void DoAlgo1(){
   Serial.println(sens_percent);
 
   if(sens_percent <= START_LEVEL && RelayStatus == 0 && AUTO_ON == 1 && checkConsistency(Sensor5History, 5, 20)){
+    AddEvent(START_LEVEL_EVENT);
     Serial.println("AUTO_ON ON");
     RelayOn();
   }
 
   if(sens_percent >= END_LEVEL && RelayStatus == 1 && AUTO_OFF == 1 && checkConsistency(Sensor5History, 5, 20)){
+    AddEvent(END_LEVEL_EVENT);
     Serial.println("AUTO_OFF OFF");
     RelayOff();
   }
@@ -570,8 +634,8 @@ bool FlowHistoryGrow(const int arr[], int size) {
   for (int i = 1; i < size - 1; i++) { // Iterate from the second to the second-last element
         bool hasGreaterLeft = false;  // To check if there's a greater number on the left
 
-        // Check if the current element is zero
-        if (arr[i] == 0) {
+        // Check if the current element is default -1
+        if (arr[i] == -1) {
             return true;
         }
 
@@ -589,8 +653,8 @@ bool FlowHistoryGrow(const int arr[], int size) {
         }
     }
 
-    // Check if the first is zero
-    if (arr[0] == 0 ) {
+    // Check if the first is default -1
+    if (arr[0] == -1 ) {
         return true;
     }
 
@@ -599,6 +663,9 @@ bool FlowHistoryGrow(const int arr[], int size) {
 
 
 void RelayOn(){
+  if(RelayStatus == 0){
+    AddEvent(PUMP_ON);
+  }
   digitalWrite(RELAY_PIN_1, HIGH); // Activamos el primer relé
   Serial.println("Relay ON");
   RelayStatus = 1;
@@ -611,6 +678,9 @@ void RelayOn(){
 }
 
 void RelayOff(){
+  if(RelayStatus == 1){
+    AddEvent(PUMP_OFF);
+  }
   digitalWrite(RELAY_PIN_1, LOW); // Activamos el primer relé
   Serial.println("Relay OFF");
   RelayStatus = 0;
@@ -677,7 +747,7 @@ bool ConnectWifi(){
 }
 
 
-void SetLocalConf(int _ALGO, int _START_LEVEL, int _END_LEVEL, int _AUTO_OFF, int _AUTO_ON, int _MIN_FLOW_MM_X_MIN, int _ACTION, int _BLIND_DISTANCE, String _HOURS_OFF){
+void SetLocalConf(int _ALGO, int _START_LEVEL, int _END_LEVEL, int _AUTO_OFF, int _AUTO_ON, int _MIN_FLOW_MM_X_MIN, int _ACTION, int _BLIND_DISTANCE, String _HOURS_OFF, int _SAFE_MODE){
 
   Serial.print("SetLocalConf: _MIN_FLOW_MM_X_MIN: ");
   Serial.println(_MIN_FLOW_MM_X_MIN);
@@ -689,6 +759,10 @@ void SetLocalConf(int _ALGO, int _START_LEVEL, int _END_LEVEL, int _AUTO_OFF, in
   
   if(_ALGO >=0 && _ALGO <= 100){
     ALGO = _ALGO;
+  }
+
+  if(_SAFE_MODE >=0 && _SAFE_MODE <=1){
+    SAFE_MODE = _SAFE_MODE;
   }
 
   if(_START_LEVEL >=0 && _START_LEVEL <= 800){
@@ -964,8 +1038,11 @@ bool GetRemoteSettings(){
       //https.setVerify .setVerify(true);
       https.setReuse(false);
 
+      PrintEvents();
+
       https.addHeader("FW-Version", (String)FIRMW_VER);
       https.addHeader("RSSI", (String)rssi);
+      https.addHeader("EVENTS", EventsLogString());
       
       https.setTimeout(timeout);
 
@@ -973,7 +1050,7 @@ bool GetRemoteSettings(){
 
       // Agrega todas las claves de los encabezados que deseas recopilar
       const char *headerKeys[] = {"percent", "event-time", "current-time", "fw-version", "distance", "pool-time",
-        "ALGO", "START_LEVEL", "END_LEVEL", "AUTO_OFF", "AUTO_ON", "MIN_FLOW_MM_X_MIN", "ACTION", "BLIND_DISTANCE", "HOURS_OFF"
+        "ALGO", "START_LEVEL", "END_LEVEL", "AUTO_OFF", "AUTO_ON", "MIN_FLOW_MM_X_MIN", "ACTION", "BLIND_DISTANCE", "HOURS_OFF", "SAFE_MODE"
       };
 
       const size_t headerKeysCount = sizeof(headerKeys) / sizeof(headerKeys[0]);
@@ -998,6 +1075,7 @@ bool GetRemoteSettings(){
           Serial.println(payload);
 
           if(payload == "OK" ){
+            ResetEvents();
             Serial.println("Remote setting OK");
 
             String sensor_percent = https.header("percent");
@@ -1049,9 +1127,10 @@ bool GetRemoteSettings(){
 
             SetLocalConf(https.header("ALGO").toInt(), https.header("START_LEVEL").toInt(), https.header("END_LEVEL").toInt(), 
               https.header("AUTO_OFF").toInt(), https.header("AUTO_ON").toInt(), https.header("MIN_FLOW_MM_X_MIN").toInt(), 
-              https.header("ACTION").toInt(), https.header("BLIND_DISTANCE").toInt(), https.header("HOURS_OFF"));
+              https.header("ACTION").toInt(), https.header("BLIND_DISTANCE").toInt(), https.header("HOURS_OFF"), https.header("SAFE_MODE").toInt());
 
           }else{
+            AddEvent(DATA_POST_FAIL);
             Serial.println("Response error!");
           }
 
@@ -1060,17 +1139,20 @@ bool GetRemoteSettings(){
 
         }
       } else {
+        AddEvent(DATA_POST_FAIL);
         Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
         https.end();
         return false;
       }
 
     } else {
+      AddEvent(DATA_POST_FAIL);
       Serial.printf("[HTTPS] Unable to connect\n");
       return false;
     }
 
   } else {
+    AddEvent(DATA_POST_FAIL);
     Serial.println("Failed to connect to WiFi");
     ConnectWifi();
   }
@@ -1132,6 +1214,7 @@ ICACHE_RAM_ATTR void botonPresionado() {
   if(millis() < 1000) return;
 
   Serial.println("El botón está presionado");
+  AddEvent(BTN_PRESS);
 
   // req x3 times press the reset btn
   Reset_BTN_Count = Reset_BTN_Count + 1;
@@ -1198,5 +1281,41 @@ void updateFirmware(int new_fw_vers) {
     http.end();
   } else {
     Serial.println("Error al conectarse al servidor.");
+  }
+}
+
+void AddEvent(EventLogs _event) {
+  for (int i = 4; i > 0; i--) {
+      EventsArray[i] = EventsArray[i - 1];
+  }
+  EventsArray[0] = _event;
+}
+
+String EventsLogString() {
+  String result = "";
+  
+  for (int i = 0; i < 5; i++) {
+    result += String(EventsArray[i]);
+    
+    // Añadir coma después de cada valor, excepto el último
+    if (i < 4) {
+      result += ",";
+    }
+  }
+  
+  return result;
+}
+
+void PrintEvents(){
+  #ifdef DEBUG
+    Serial.print("Events: ");
+    Serial.println(EventsLogString());
+  #endif
+}
+
+void ResetEvents(){
+
+  for (int i = 0; i <= 4; i++) {
+    EventsArray[i] = NO_EVENT;
   }
 }
