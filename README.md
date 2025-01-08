@@ -106,7 +106,7 @@ setup and functionality.
   * Printable 3D Case
 * Firmware software
 
-The server side (cloud services) that use the device are not 
+The server side implementation at https://waterlevel.pro/ (cloud services) that use the device are not 
 included in this project or git repo and are not opensource.
 
 ---
