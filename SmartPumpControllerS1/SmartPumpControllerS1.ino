@@ -57,7 +57,7 @@ const bool DEV_MODE = false; // used for ON/OFF live-updates and other other saf
 const bool LIVE_UPDATE = true; // used for ON/OFF live-updates and other other safety instructions for easy development
 
 const char* firmwareUrl = "https://waterlevel.pro/static/fw";
-int FIRMW_VER = 17;
+int FIRMW_VER = 18;
 
 // Pin del botón wifi-setup/reset
 const int pinBoton = 1;
@@ -98,6 +98,7 @@ int IDLE_CONNECTION_SECS = 0; // calc. based on sensor pool-time
 int MIN_FLOW_MM_X_MIN = 0;
 int BLIND_DISTANCE = 22;
 String HOURS_OFF = "-";
+int WIFI_POOL_TIME = 10000; // wifi usage pool time in mili-seconds
 
 int Sensor5History[5] = {-1, -1, -1, -1, -1};
 
@@ -212,6 +213,7 @@ void setup() {
   MIN_FLOW_MM_X_MIN = 0;
   IDLE_FLOW_EVENT_TIME = 0;
   Reset_BTN_Count = 0;
+  WIFI_POOL_TIME = 10000;
 
   IS_WAITING = false;
 
@@ -253,7 +255,7 @@ void saveConfigCallback() {
       Serial.print("Email to linked: ");
       Serial.println(email);
     #else
-       delay(10);
+       delay(5);
     #endif
   }else{
     Serial.print("Invalid email: ");
@@ -262,7 +264,7 @@ void saveConfigCallback() {
   }
 
 }
-
+  
 
 int myStrlen(const char* str) {
   int len = 0;
@@ -271,6 +273,32 @@ int myStrlen(const char* str) {
     str++;
   }
   return len;
+}
+
+void non_lock_delay(unsigned long mili_seconds) {
+  static unsigned long previousMillis = 0;
+  static bool isWaiting = false;
+
+  unsigned long currentMillis = millis();
+
+  // Inicio de espera
+  if (!isWaiting) {
+    previousMillis = currentMillis;
+    isWaiting = true;
+  }
+
+  while (isWaiting) {
+    currentMillis = millis();
+    
+    // Verificar si el tiempo ha pasado
+    if (currentMillis - previousMillis >= mili_seconds) {
+      isWaiting = false; // Reiniciar la espera
+
+    }
+
+    // Permitir que el sistema operativo maneje tareas críticas
+    delay(1); // Mantener el sistema operativo funcionando mientras se espera
+  }
 }
 
 
@@ -316,7 +344,7 @@ void loop() {
 
   //restart each 24 hours, when relay is OFF
   if(millis() > 86400000 && RelayStatus == 0){
-    delay(500);
+    delay(5);
     esp_system_abort("restart_after_wakeup");
   }
 
@@ -331,7 +359,7 @@ void loop() {
 
     u8g2.sendBuffer();
 
-    delay(10000); // Esperamos 10 segundos
+    non_lock_delay(10000); // Esperamos 10 segundos
     return;
   }
 
@@ -377,7 +405,7 @@ void loop() {
       u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "AUTO OFF!" );
       u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Smart Mode OFF!" );
 
-      delay(20000); // Esperamos 20 segundos
+      non_lock_delay(20000); // Esperamos 20 segundos
     }
   }
 
@@ -393,7 +421,7 @@ void loop() {
       u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "AUTO OFF!" );
       u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Smart Mode OFF!" );
 
-      delay(20000); // Esperamos 20 segundos
+      non_lock_delay(20000); // Esperamos 20 segundos
     }
   }
 
@@ -407,7 +435,7 @@ void loop() {
     u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "AUTO OFF!" );
     u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "FULL" );
 
-    delay(20000); // Esperamos 20 segundos
+    non_lock_delay(20000); // Esperamos 20 segundos
   }
 
   if(AUTO_OFF > 0 && IDLE_CONNECTION_SECS != 0 &&  sens_current_time > 0 && sens_event_time > 0 && sens_current_time - sens_event_time > IDLE_CONNECTION_SECS){
@@ -420,14 +448,14 @@ void loop() {
     u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "AUTO OFF!" );
     u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "SENSOR OFFLINE" );
 
-    delay(20000); // Esperamos 20 segundos
+    non_lock_delay(20000); // Esperamos 20 segundos
   }
 
   if(ALGO == 1){
     DoAlgo1();
   }
   u8g2.sendBuffer();
-  delay(10000); // Esperamos 10 segundos
+  non_lock_delay(WIFI_POOL_TIME); // Esperamos 10 segundos
 }
 
 
@@ -529,13 +557,13 @@ void DoAlgo1(){
         Serial.println("Off hours detected");
 
         u8g2.sendBuffer();
-        delay(10000);
+        non_lock_delay(10000);
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_7x14B_tr);
         u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "WARNING!" );
         u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Disabled Hours!" );
         u8g2.sendBuffer();
-        delay(5000);
+        non_lock_delay(5000);
 
         RelayOff();
         return;
@@ -571,13 +599,13 @@ void DoAlgo1(){
     Serial.println("Waiting 3 hours for better flow");
 
     u8g2.sendBuffer();
-    delay(10000);
+    non_lock_delay(10000);
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_7x14B_tr);
     u8g2.drawButtonUTF8(64, 10, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "WARNING!" );
     u8g2.drawButtonUTF8(64, 35, U8G2_BTN_HCENTER|U8G2_BTN_BW2, 34,  2,  2, "Low Flow, Waiting!" );
     u8g2.sendBuffer();
-    delay(5000);
+    non_lock_delay(5000);
 
     return;
   }else if(IS_WAITING){
@@ -718,7 +746,7 @@ bool ConnectWifi(){
     WiFi.mode(WIFI_STA); // explicitly set mode
     //WiFi.setTxPower(WIFI_POWER_8_5dBm);
     //wifi_station_connect();
-    delay(250);
+    delay(5);
 
     wm.setConnectRetries(3);
     wm.setConnectTimeout(15);
@@ -867,7 +895,7 @@ bool HttpRegDevice(){
     #ifdef DEBUG
       Serial.println("Connected to WiFi");
     #else
-       delay(10);
+       delay(5);
     #endif
 
     long timeout = 15000;
@@ -884,7 +912,7 @@ bool HttpRegDevice(){
     #ifdef DEBUG
       Serial.print("[HTTPS] begin...\n");
     #else
-       delay(10);
+       delay(5);
     #endif
 
 
@@ -926,7 +954,7 @@ bool HttpRegDevice(){
         #ifdef DEBUG
           Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
         #else
-          delay(10);
+          delay(5);
         #endif
 
         // file found at server
@@ -938,7 +966,7 @@ bool HttpRegDevice(){
             Serial.print("response payload: ");
             Serial.println(payload);
           #else
-            delay(10);
+            delay(5);
           #endif
 
           if(payload == "OK"){
@@ -953,10 +981,12 @@ bool HttpRegDevice(){
               Serial.println(api_key);
             #endif
 
-            if(wlp_key.length() >= 7 && strcmp(api_key, "-") == 0)
+            if(wlp_key.length() >= 7)
             {
                 strcpy(api_key, wlp_key.c_str());
-                load_private_key();
+                nvs_set_str(my_nvs_handle, "PrivateKey", api_key);
+                nvs_commit(my_nvs_handle);
+                delay(5);
             }
             #ifdef DEBUG
               else{
@@ -975,7 +1005,7 @@ bool HttpRegDevice(){
         #ifdef DEBUG
           Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
         #else
-          delay(10);
+          delay(5);
         #endif
         https.end();
         return false;
@@ -985,7 +1015,7 @@ bool HttpRegDevice(){
       #ifdef DEBUG
         Serial.printf("[HTTPS] Unable to connect\n");
       #else
-       delay(10);
+       delay(5);
     #endif
       return false;
     }
@@ -994,7 +1024,7 @@ bool HttpRegDevice(){
     #ifdef DEBUG
       Serial.println("Failed to connect to WiFi");
     #else
-       delay(10);
+       delay(5);
     #endif
   }
   return false;
@@ -1166,7 +1196,7 @@ bool SetupResetWifi(){
   //WiFi.setTxPower(WIFI_POWER_8_5dBm);
   WiFi.mode(WIFI_AP); // explicitly set mode
   //WiFi.setTxPower(WIFI_POWER_8_5dBm);
-  delay(50);
+  delay(5);
   
   wm.setCaptivePortalEnable(true);
 
@@ -1185,24 +1215,24 @@ bool SetupResetWifi(){
     CurrentStatus = WIFI_SETUP;
     wm.resetSettings();
 
-    delay(300);
+    delay(5);
     //reset and try again, or maybe put it to deep sleep
     esp_system_abort("restart_after_wakeup");
-    delay(500);
+    delay(5);
   }
 
-  delay(30);
+  delay(5);
   if(myStrlen(email) > 7){
     HttpRegDevice();
   }
 
-  delay(50);
+  delay(5);
   nvs_set_i32(my_nvs_handle, "0-status", (int32_t)WIFI);
   nvs_commit(my_nvs_handle);
   CurrentStatus = WIFI;
 
   Serial.println("Setup Wifi Success");
-  delay(50);
+  delay(5);
   esp_system_abort("restart_after_wakeup");
 
 }
@@ -1230,7 +1260,7 @@ ICACHE_RAM_ATTR void botonPresionado() {
   //reset settings
   wm.resetSettings();
 
-  delay(50);
+  delay(5);
   esp_system_abort("restart_after_wakeup");
 
 }
@@ -1263,7 +1293,7 @@ void updateFirmware(int new_fw_vers) {
         if (Update.writeStream(stream)) {
           if (Update.end()) {
             Serial.println("Actualización exitosa. Reiniciando...");
-            delay(500);
+            delay(5);
             esp_system_abort("restart_after_wakeup");
           } else {
             Serial.println("Error al finalizar la actualización.");
