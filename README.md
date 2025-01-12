@@ -111,13 +111,56 @@ included in this project or git repo and are not opensource.
 
 ---
 
-## Disclaimer
 
-This open-source electronics project is provided **"as is."** No warranties of any kind, 
-either express or implied, including but not limited to implied warranties of 
-merchantability or fitness for a particular purpose, are made. Use this project at 
-your own risk. We are not responsible for any damage, loss, or inconvenience that 
-may arise from the use of this project.
+## Important Disclaimer
+
+> **Disclaimer:**  
+This open-source electronics project/device is provided strictly for experimental, educational, and developmental purposes. It is offered "as is," without any warranties, express or implied. This includes, but is not limited to, implied warranties of merchantability, fitness for a particular purpose, or non-infringement.
+
+### By using this device, you acknowledge and accept that:
+
+- You assume all risks associated with its use, including but not limited to potential damage to property, personal injury, or any other unintended consequences.
+- This device is not certified for commercial, industrial, or safety-critical applications. It is intended solely for developers, hobbyists, and other users with appropriate technical expertise.
+- The creators and distributors of this project are not liable for any damages, losses, or inconveniences resulting from its use, modification, or integration into other systems.
+
+Users are solely responsible for ensuring that the use of this device complies with local laws, regulations, and safety standards in their region.
+
+---
+
+### Donations for Certifications and Safety Testing (UL, CE, FCC)
+
+To help reduce risks and obtain certifications for UL, CE, and FCC safety testing, 
+your contributions are greatly appreciated. You can donate via the following channels:
+
+#### GitHub Sponsors:
+
+<div align="center">
+  <h5><a href="https://github.com/sponsors/rrguardo" >GitHub Sponsors</a></h5>
+  <img src="images/cards.png" alt="btc" width="100px" />
+</div>
+
+
+---
+
+#### Crypto Donations:
+
+<div align="center">
+  <img src="images/btc.png" alt="btc" width="100px" />
+  <h5>Bitcoin (BTC):</h5>
+  <img src="images/btc_donations.png" alt="RD" width="170px" />
+  <p><b>BTC Address:</b> bc1qv9eeluynl70g87l4agf48x6ktqtetswk7kyyng</p>
+</div>
+
+---
+
+<div align="center">
+  <img src="images/eth.png" alt="RD" width="100px" />
+  <h5>Ethereum (ETH):</h5>
+  
+  <img src="images/eth_donations.png" alt="RD" width="170px" />
+  <p><b>ETH Address:</b> 0x9f87cF861eA526B78C72a30BB1bD37758c2f36Ed</p>
+</div>
+
 
 ---
 

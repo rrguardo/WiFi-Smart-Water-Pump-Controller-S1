@@ -631,9 +631,7 @@ void DoAlgo1(){
         Serial.println("Slow flow detected");
         return;
       }
-      
-      }
-    
+    }
   }
 
   
