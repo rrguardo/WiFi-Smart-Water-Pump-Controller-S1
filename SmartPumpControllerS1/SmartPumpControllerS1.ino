@@ -57,7 +57,7 @@ const bool DEV_MODE = false; // used for ON/OFF live-updates and other other saf
 const bool LIVE_UPDATE = true; // used for ON/OFF live-updates and other other safety instructions for easy development
 
 const char* firmwareUrl = "https://waterlevel.pro/static/fw";
-int FIRMW_VER = 18;
+int FIRMW_VER = 19;
 
 // Pin del botón wifi-setup/reset
 const int pinBoton = 1;
@@ -100,7 +100,7 @@ int BLIND_DISTANCE = 22;
 String HOURS_OFF = "-";
 int WIFI_POOL_TIME = 10000; // wifi usage pool time in mili-seconds
 
-int Sensor5History[5] = {-1, -1, -1, -1, -1};
+int Sensor5History[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 
 int sens_percent = 0; // filled percent
@@ -344,6 +344,7 @@ void loop() {
 
   //restart each 24 hours, when relay is OFF
   if(millis() > 86400000 && RelayStatus == 0){
+    GetRemoteSettings();
     delay(5);
     esp_system_abort("restart_after_wakeup");
   }
@@ -394,7 +395,7 @@ void loop() {
     RelayOff();
   }
 
-  if(SAFE_MODE == 1 && checkConsistency(Sensor5History, 5, 20) && sensor_last_distance <= (BLIND_DISTANCE - BLIND_MARGIN_EXTRA)){
+  if(SAFE_MODE == 1 && checkConsistency(Sensor5History, 10, 20) && sensor_last_distance <= (BLIND_DISTANCE - BLIND_MARGIN_EXTRA)){
     Serial.println("Danger blind distance detected");
     AddEvent(BLIND_AREA_DANGER);
     if(AUTO_OFF){
@@ -409,7 +410,7 @@ void loop() {
     }
   }
 
-  if(SAFE_MODE == 1 && Sensor5History[4] == 0 && Sensor5History[5] == 0){
+  if(SAFE_MODE == 1 && Sensor5History[8] == 0 && Sensor5History[9] == 0){
     Serial.println("Danger blind distance or sensor fail detected");
     AddEvent(BLIND_AREA_DANGER);
     AddEvent(SENSOR_FAULT);
@@ -515,7 +516,7 @@ void PrintHistory(){
     Serial.println("======================");
       Serial.println("Sensor5History: ");
 
-      for (int i = 0; i <= 4; i++) {
+      for (int i = 0; i <= 9; i++) {
         Serial.println(Sensor5History[i]);
       }
     Serial.println("======================");
@@ -623,7 +624,7 @@ void DoAlgo1(){
 
       PrintHistory();
 
-      if(!FlowHistoryGrow(Sensor5History, 5)){
+      if(!FlowHistoryGrow(Sensor5History, 10)){
         AddEvent(NOT_FLOW);
         IDLE_FLOW_EVENT_TIME = millis();
         RelayOff();
@@ -641,13 +642,13 @@ void DoAlgo1(){
   Serial.print("sens_percent: ");
   Serial.println(sens_percent);
 
-  if(sens_percent <= START_LEVEL && RelayStatus == 0 && AUTO_ON == 1 && checkConsistency(Sensor5History, 5, 20)){
+  if(sens_percent <= START_LEVEL && RelayStatus == 0 && AUTO_ON == 1 && checkConsistency(Sensor5History, 10, 20)){
     AddEvent(START_LEVEL_EVENT);
     Serial.println("AUTO_ON ON");
     RelayOn();
   }
 
-  if(sens_percent >= END_LEVEL && RelayStatus == 1 && AUTO_OFF == 1 && checkConsistency(Sensor5History, 5, 20)){
+  if(sens_percent >= END_LEVEL && RelayStatus == 1 && AUTO_OFF == 1 && checkConsistency(Sensor5History, 10, 20)){
     AddEvent(END_LEVEL_EVENT);
     Serial.println("AUTO_OFF OFF");
     RelayOff();
@@ -660,14 +661,9 @@ bool FlowHistoryGrow(const int arr[], int size) {
   for (int i = 1; i < size - 1; i++) { // Iterate from the second to the second-last element
         bool hasGreaterLeft = false;  // To check if there's a greater number on the left
 
-        // Check if the current element is default -1
-        if (arr[i] == -1) {
-            return true;
-        }
-
         // Check for a greater number on the left
         for (int j = 0; j < i; j++) {
-            if (arr[j] > arr[i]) {
+            if (arr[j] > arr[i] && arr[i] >= 0) {
                 hasGreaterLeft = true;
                 break;
             }
@@ -677,11 +673,6 @@ bool FlowHistoryGrow(const int arr[], int size) {
         if (hasGreaterLeft) {
             return true;
         }
-    }
-
-    // Check if the first is default -1
-    if (arr[0] == -1 ) {
-        return true;
     }
 
     return false; // Return false if no element meets the conditions
@@ -1131,10 +1122,10 @@ bool GetRemoteSettings(){
             if(sens_event_time != sens_event_last_time){
               sens_event_last_time = sens_event_time;
 
-              for (int i = 0; i < 4; i++) {
+              for (int i = 0; i < 9; i++) {
                   Sensor5History[i] = Sensor5History[i + 1];
               }
-              Sensor5History[4] = sensor_distance.toInt();
+              Sensor5History[9] = sensor_distance.toInt();
             }
             
             sens_current_time = sensor_current_time.toInt();
