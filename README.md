@@ -127,43 +127,6 @@ Users are solely responsible for ensuring that the use of this device complies w
 
 ---
 
-### Donations for Certifications and Safety Testing (UL, CE, FCC)
-
-To help reduce risks and obtain certifications for UL, CE, and FCC safety testing, 
-your contributions are greatly appreciated. You can donate via the following channels:
-
-#### GitHub Sponsors:
-
-<div align="center">
-  <h5><a href="https://github.com/sponsors/rrguardo" >GitHub Sponsors</a></h5>
-  <img src="images/cards.png" alt="btc" width="100px" />
-</div>
-
-
----
-
-#### Crypto Donations:
-
-<div align="center">
-  <img src="images/btc.png" alt="btc" width="100px" />
-  <h5>Bitcoin (BTC):</h5>
-  <img src="images/btc_donations.png" alt="RD" width="170px" />
-  <p><b>BTC Address:</b> bc1qv9eeluynl70g87l4agf48x6ktqtetswk7kyyng</p>
-</div>
-
----
-
-<div align="center">
-  <img src="images/eth.png" alt="RD" width="100px" />
-  <h5>Ethereum (ETH):</h5>
-  
-  <img src="images/eth_donations.png" alt="RD" width="170px" />
-  <p><b>ETH Address:</b> 0x9f87cF861eA526B78C72a30BB1bD37758c2f36Ed</p>
-</div>
-
-
----
-
 <div align="center">
   <h5>Designed in the Dominican Republic 2024-2025</h5>
   <img src="images/rd.gif" alt="RD" width="70px" />
