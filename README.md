@@ -31,7 +31,7 @@ under the GPLv3 license, allowing for free use and modification.
 
 ## Hardware part at OSHWLab
 
-[WiFi Smart Water Pump Controller S1](https://oshwlab.com/rrguardo83/automatic-water-pump-for-s1)
+[SmartSwitch C3 Module](https://oshwlab.com/rrguardo83/automatic-water-pump-for-s1)
 
 ![PCB](images/C1_PCB.png)
 
