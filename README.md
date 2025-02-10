@@ -29,6 +29,12 @@ under the GPLv3 license, allowing for free use and modification.
 
 ---
 
+## DIY Guide
+
+For a detailed guide on how to build this project, check out the full tutorial at [Instructables](https://www.instructables.com/DIY-WiFi-Smart-Water-Pump-Controller-S1-Build-Your/).
+
+---
+
 ## Hardware part at OSHWLab
 
 [SmartSwitch C3 Module](https://oshwlab.com/rrguardo83/automatic-water-pump-for-s1)
