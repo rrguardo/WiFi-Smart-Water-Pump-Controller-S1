@@ -18,6 +18,17 @@ refer to the [full features page](https://waterlevel.pro/products/WiFi-Smart-Wat
 
 ![PCB](images/HowWorksS1Controller.png)
 
+## Server-Side Platform
+
+The server-side project used by this controller is available at:
+[WaterLevel.Pro server-side repository](https://github.com/rrguardo/WaterLevel.Pro)
+
+![WiFi Smart Water Pump Controller S1](https://waterlevel.pro/static/prod_img/tab.png)
+
+Related server-side features include device-to-cloud communication endpoints,
+remote pump control actions, water-level telemetry handling, alert/event workflows,
+and account-based multi-device management for monitoring and automation.
+
 The project is open source and open hardware, licensed under GPLv3. All hardware, software, and
 3D printable components were designed from scratch by me, **Raul Rodriguez Guardo**, and are released 
 under the GPLv3 license, allowing for free use and modification.
@@ -112,8 +123,9 @@ setup and functionality.
   * Printable 3D Case
 * Firmware software
 
-The server side implementation at https://waterlevel.pro/ (cloud services) that use the device are not 
-included in this project or git repo and are not opensource.
+The server side implementation used by this device is maintained in a separate repository:
+[https://github.com/rrguardo/WaterLevel.Pro](https://github.com/rrguardo/WaterLevel.Pro).
+This firmware/hardware repository does not include the server-side source code directly.
 
 ---
 
